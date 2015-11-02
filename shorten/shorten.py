@@ -1,42 +1,45 @@
-#! bin/python
+#!/usr/bin/env python
 
-import random
+import hashlib
+import hmac
+import argparse
+import struct
 
-_table = ["%c" % x for x in range(ord('A'),ord('Z')+1)]
-_table = _table + ["%c" % x for x in range(ord('a'),ord('z')+1)]
-_table = _table + ["%c" % x for x in range(ord('0'),ord('9')+1)]
-_table.append('#')
-_table.append('$')
+_table = ['s', 'H', 'o', 'R', 't', 'E', 'n', 'U', 'r', 'L' ]
 
-_pows = [(len(_table)**x)-1 for x in range(1,10)]
+_key = "shortenurl"
 
-_numdigits = 1
+_shorturl = 'http://short.xyz/'
 
-_counter = 0
+def _truncated_value(h):
+    v = h[-1]
+    if not isinstance(v, int): v = ord(v) # Python 2.x
+    offset = v & 0xF
+    (value,) = struct.unpack('>I', h[offset:offset + 4])
+    return value & 0x7FFFFFFF
 
-_mem = {}
-_mem[0] = _table
-random.shuffle(_mem[0])
+def _dec(h,p):
+    th = _truncated_value(h)
+    digits = str(th)
+    return digits[-p:].zfill(p)
 
-def gethint():
-  global _table
-  global _pows
-  global _numdigits
-  global _counter
-  global _mem
-  h = ''
-  curr = _counter
-  for x in range(_numdigits):
-    digit = curr & 0x3f
-    curr = curr >> 6
-    h = h + _mem[x][digit]
-  _counter = _counter + 1
-  if _counter in _pows:
-    _mem[_numdigits] = _table
-    random.shuffle(_mem[_numdigits])
-    _numdigits = _numdigits + 1
-  return h[::-1]
+def shorten(long_url):
+    s = ''
+    h = hmac.new(_key,long_url, hashlib.sha1).digest()
+    d = _dec(h, 8)
+    for i in d:
+        s += _table[int(i)]
+    return _shorturl + s
 
 if __name__ == "__main__":
-  for x in range(1000):
-    print(gethint())
+  parser = argparse.ArgumentParser()
+  group = parser.add_mutually_exclusive_group(required=True)
+  group.add_argument('-l', '--longurl', help="Url to be shortened")
+  group.add_argument("-f", "--urlfile", help="Input file with long urls separated by newline")
+  args = parser.parse_args()
+  if args.longurl:
+      print(shorten(args.longurl))
+  else:
+      with open(args.urlfile,'r') as f:
+          for l in f:
+              print(shorten(l))
