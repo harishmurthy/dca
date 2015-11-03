@@ -73,9 +73,15 @@ class HeartBeatMonitor(cmd.Cmd):
         print('Add machines to the list of monitored. Usage: add_machines M1 M2 M3 ...')
 
     def do_add_machines(self,line):
+        global _activemachines
+        global _deadmachines
+        currmachines = _activemachines | _deadmachines
         m = line.split(' ')
         for i in m:
-            _recovermachine(i)
+            if i not in currmachines:
+                _recovermachine(i)
+            else:
+                print('Machine ' + str(i) + ' already present')
 
     def help_remove_machines(self):
         print('Remove machines from the list of monitored. Usage: remove_machines M1 M2 M3 ...')
@@ -83,23 +89,33 @@ class HeartBeatMonitor(cmd.Cmd):
     def do_remove_machines(self,line):
         global _activemachines
         global _deadmachines
+        currmachines = _activemachines | _deadmachines
         m = line.split(' ')
         for i in m:
-            os.remove(os.path.join(TOPDIR,str(i),'alive'))
-            os.rmdir(os.path.join(TOPDIR,str(i)))
-            _activemachines.discard(i)
-            _deadmachines.discard(i)
+            if i in currmachines:
+                os.remove(os.path.join(TOPDIR,str(i),'alive'))
+                os.rmdir(os.path.join(TOPDIR,str(i)))
+                _activemachines.discard(i)
+                _deadmachines.discard(i)
+            else:
+                print('Machine ' + str(i) + ' not present')
+
 
     def help_is_machine_alive(self):
         print('Checks and return TRUE is given machine is alive')
 
     def do_is_machine_alive(self,line):
         global _activemachines
+        global _deadmachines
+        currmachines = _activemachines | _deadmachines
         m = line.split(' ')[0]
-        if m in _activemachines:
-            print('True')
+        if m in currmachines:
+            if m in _activemachines:
+                print('True')
+            else:
+                print('False')
         else:
-            print('False')
+            print('Machine not present')
 
     def help_num_machines_alive(self):
         print('Returns the number of machines currently alive')
