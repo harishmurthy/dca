@@ -23,7 +23,8 @@ def _failsomemachines():
     s = list(_activemachines)
     for i in range(_failureratio):
         m = random.choice(s)
-        os.remove(os.path.join(TOPDIR,str(m),'alive'))
+        if os.path.exits(os.path.join(TOPDIR,str(m),'alive')):
+            os.remove(os.path.join(TOPDIR,str(m),'alive'))
 
 def _recovermachine(m):
     if not os.path.exists(TOPDIR+str(m)):
@@ -133,6 +134,11 @@ class HeartBeatMonitor(cmd.Cmd):
         print(str(_failuretrend))
 
     def do_quit(self,line):
+        global _activemachines
+        global _deadmachines
+        signal.setitimer(signal.ITIMER_REAL,0,0)
+        _activemachines.clear()
+        _deadmachines.clear()
         for root,dirs,files in os.walk(TOPDIR,topdown=False):
             for i in files:
                 os.remove(os.path.join(root,i))
