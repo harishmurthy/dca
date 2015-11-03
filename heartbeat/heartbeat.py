@@ -7,6 +7,7 @@ import signal
 import random
 import sys
 import os
+import math
 
 TOPDIR = '/tmp/machines/'
 _currentinterval = 1
@@ -148,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument("recoverytime", help="number of seconds taken by a failed machine to recover", type=int, metavar='t')
     args = parser.parse_args()
     _machines = args.machines
-    _failureratio = _machines * args.failures / 100
+    _failureratio = int(math.ceil(_machines * args.failures / 100.0))
     _recoveryinterval = args.recoverytime
     os.mkdir(TOPDIR)
     for i in range(_machines):
