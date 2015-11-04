@@ -6,6 +6,7 @@ import random
 import sys
 import os
 import math
+import shutil
 from multiprocessing import Pool
 
 TOPDIR = '/tmp/machines/'
@@ -49,7 +50,7 @@ def _recoverdeadmachines(deadmachines):
         p.close()
         p.join()
 
-def probeallmachines(machines):
+def _probeallmachines(machines):
     if machines:
         p = Pool()
         m = p.map(_probemachine,machines)
@@ -58,12 +59,10 @@ def probeallmachines(machines):
         return m
 
 def getalivemachines():
-    global _machines
-    p = probeallmachines(_machines)
-    activemachines = {u for x in p for u in x if x[u]}
-    return activemachines
+    global _activemachines
+    return _activemachines.copy()
 
-def signalhandler(signum, frame):
+def _signalhandler(signum, frame):
     global _currentinterval
     global _machines
     global _failureratio
@@ -71,7 +70,7 @@ def signalhandler(signum, frame):
     global _activemachines
     global _deadmachines
     global _failuretrend
-    p = probeallmachines(_machines)
+    p = _probeallmachines(_machines)
     _activemachines = {u for x in p for u in x if x[u]}
     _deadmachines = _machines - _activemachines
     if not _currentinterval % 5:
@@ -84,21 +83,33 @@ def signalhandler(signum, frame):
         _failuretrend[_currentinterval % 10] = len(_activemachines)
     _currentinterval += 1
 
-def startmachines(nummachines,start=0):
+def startmachines(nummachines,startcount=0,failureratio=0,recoverytime=0):
     global _machines
     if not os.path.exists(TOPDIR):
         os.mkdir(TOPDIR)
     _machines = {x for x in range(nummachines)}
-    if start:
-        m = random.sample(_machines,start)
+    if startcount:
+        m = random.sample(_machines,startcount)
     else:
         m = _machines 
     for i in m:
         _recovermachine(i)
+    global _failureratio
+    global _recoveryinterval
+    if failureratio:
+        _failureratio = failureratio
+    if recoverytime:
+        _recoveryinterval = recoverytime
 
 def startprobe():
-    signal.signal(signal.SIGALRM, signalhandler)
+    signal.signal(signal.SIGALRM, _signalhandler)
     signal.setitimer(signal.ITIMER_REAL,1,1)
+
+def shutdown():
+    global _machines
+    signal.setitimer(signal.ITIMER_REAL,0,0)
+    _machines.clear()
+    shutil.rmtree(TOPDIR,ignore_errors=True)
 
 class HeartBeatMonitor(cmd.Cmd):
     prompt = 'HeartBeatMonitor>'
@@ -165,17 +176,7 @@ class HeartBeatMonitor(cmd.Cmd):
         print(str(_failuretrend))
 
     def do_quit(self,line):
-        global _machines
-        global _activemachines
-        global _deadmachines
-        signal.setitimer(signal.ITIMER_REAL,0,0)
-        _machines.clear()
-        for root,dirs,files in os.walk(TOPDIR,topdown=False):
-            for i in files:
-                os.remove(os.path.join(root,i))
-            for i in dirs:
-                os.rmdir(os.path.join(root,i))
-        os.removedirs(TOPDIR)
+        shutdown()
         print('Bye.')
         sys.exit(0)
 

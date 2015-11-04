@@ -115,6 +115,8 @@ def text_merkle_tree(infile,content=None):
       if content is not None:
         content[str(lineid)] = hexlify(x)
       lineid = lineid + 1
+    if not mer:
+      mer['line1'] = hexlify(md5(' ').digest())
     return mer
 
 if __name__ == "__main__":
