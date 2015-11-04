@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-import argparse
 import cmd
-import readline
 import signal
 import random
 import sys
@@ -51,7 +49,7 @@ def _recoverdeadmachines(deadmachines):
         p.close()
         p.join()
 
-def _probeallmachines(machines):
+def probeallmachines(machines):
     if machines:
         p = Pool()
         m = p.map(_probemachine,machines)
@@ -59,7 +57,13 @@ def _probeallmachines(machines):
         p.join()
         return m
 
-def _signalhandler(signum, frame):
+def getalivemachines():
+    global _machines
+    p = probeallmachines(_machines)
+    activemachines = {u for x in p for u in x if x[u]}
+    return activemachines
+
+def signalhandler(signum, frame):
     global _currentinterval
     global _machines
     global _failureratio
@@ -67,8 +71,7 @@ def _signalhandler(signum, frame):
     global _activemachines
     global _deadmachines
     global _failuretrend
-    m = list(_machines)
-    p = _probeallmachines(_machines)
+    p = probeallmachines(_machines)
     _activemachines = {u for x in p for u in x if x[u]}
     _deadmachines = _machines - _activemachines
     if not _currentinterval % 5:
@@ -80,6 +83,22 @@ def _signalhandler(signum, frame):
     else:
         _failuretrend[_currentinterval % 10] = len(_activemachines)
     _currentinterval += 1
+
+def startmachines(nummachines,start=0):
+    global _machines
+    if not os.path.exists(TOPDIR):
+        os.mkdir(TOPDIR)
+    _machines = {x for x in range(nummachines)}
+    if start:
+        m = random.sample(_machines,start)
+    else:
+        m = _machines 
+    for i in m:
+        _recovermachine(i)
+
+def startprobe():
+    signal.signal(signal.SIGALRM, signalhandler)
+    signal.setitimer(signal.ITIMER_REAL,1,1)
 
 class HeartBeatMonitor(cmd.Cmd):
     prompt = 'HeartBeatMonitor>'
@@ -161,18 +180,12 @@ class HeartBeatMonitor(cmd.Cmd):
         sys.exit(0)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("machines", help="Number of machines", type=int, metavar='N')
-    parser.add_argument("failures", help="percentage of machines that will fail every 5 seconds", type=int, metavar='f')
-    parser.add_argument("recoverytime", help="number of seconds taken by a failed machine to recover", type=int, metavar='t')
-    args = parser.parse_args()
-    _failureratio = int(math.ceil(args.machines * args.failures / 100.0))
-    _recoveryinterval = args.recoverytime
-    os.mkdir(TOPDIR)
-    for i in range(args.machines):
-        _recovermachine(i)
-    _machines = {x for x in range(args.machines)}
-    signal.signal(signal.SIGALRM, _signalhandler)
-    signal.setitimer(signal.ITIMER_REAL,1,1)
-    h = HeartBeatMonitor()
-    h.cmdloop()
+    rinput = raw_input('Enter the number of machines: ')
+    machines = int(rinput)
+    rinput = raw_input('Enter the percentage of machines that will fail every 5 seconds: ')
+    _failureratio = int(math.ceil(int(rinput) * machines / 100.0))
+    rinput = raw_input('Enter the number of seconds taken by a failed machine to recover: ')
+    _recoveryinterval = int(rinput)
+    startmachines(machines)
+    startprobe()
+    HeartBeatMonitor().cmdloop()
