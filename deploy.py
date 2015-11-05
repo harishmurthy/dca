@@ -12,8 +12,8 @@ srchash = {}
 def hashdir(d):
 	h = {}
 	for x in os.listdir(d):
-		if x == 'alive':
-			continue
+		#if x == 'alive':
+		#	continue
 		h[x] = hashtree.hashtreeify(os.path.join(d,x))['topdigest']
 	return h
 
@@ -22,7 +22,10 @@ def merkledeploy(m):
 	global srchash
 	dsthash = hashdir(os.path.join(heartbeat.TOPDIR,str(m)))
 	if dsthash != srchash:
-		for x in srchash:
+		common = set(srchash.keys()) & set(dsthash.keys())
+		diffset = {x for x in common if srchash[x] != dsthash[x]}
+		diffset |= set(srchash.keys()) - set(dsthash.keys())
+		for x in diffset:
 			shutil.copy(srcdir+x,os.path.join(heartbeat.TOPDIR,str(m),x))
 	dsthash = hashdir(os.path.join(heartbeat.TOPDIR,str(m)))
 	return dsthash == srchash
